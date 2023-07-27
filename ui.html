@@ -1,0 +1,86 @@
+<style>
+  body{
+    font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+  }
+
+  button {
+    width: 100px;
+    height: 30px;
+    border-radius: 10px;
+    box-shadow: none;
+  }
+
+  button:hover{
+    background-color: beige;
+  }
+</style>
+
+<h1>Select the collection to export to scss</h2>
+<div id="opt_container"></div>
+<div id="var_container"></div>
+<br>
+<button id="cancel">Cancel</button>
+<script>
+  var collectionToExportId;
+  parent.postMessage({ pluginMessage: { type: 'load-collections' } }, '*')
+
+  document.getElementById('cancel').onclick = () => {
+    parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*')
+  }
+
+  onmessage = (event) => {
+    switch(event.data.pluginMessage['type']){
+      case 'COLLECTION_RESPONSE':
+        downloadFile(event.data.pluginMessage['response'], event.data.pluginMessage['collectionName']);
+        break;
+      case 'COLLECTION_AVAILABLE':
+        let collection = event.data.pluginMessage['response'];
+        let optContainer = document.getElementById('opt_container');
+        let colectionContainer = document.createElement('div');
+        let tittle = document.createElement('h2');
+        tittle.appendChild(document.createTextNode(collection.name));
+        optContainer.appendChild(tittle);
+
+        console.log(collection);
+
+        collection.modes.forEach( mode => {
+          var checkbox = document.createElement('input');
+          checkbox.type = "checkbox";
+          checkbox.id = mode.modeId;
+
+          var label = document.createElement('label');
+          label.innerHTML = mode.name;
+          label.htmlFor = mode.modeId;
+          label.appendChild(checkbox);
+
+          //this just for two breaks
+          for (let index = 0; index < 2; index++) {
+            var br = document.createElement('br');
+            label.appendChild(br);
+          }
+          
+          checkbox.onclick = function(){
+            parent.postMessage({ pluginMessage: { type: 'create-scss', selectedCollectionId: collection.id, selectedModeId: mode.modeId, selectedModeName: mode.name} }, '*');
+            checkbox.checked = false;
+          };
+          colectionContainer.append(label);
+          optContainer.appendChild(colectionContainer);
+        });
+        var hr = document.createElement('hr');
+        colectionContainer.append(hr);
+        break;
+      default:
+        console.warn("got this from the plugin code", event.data.pluginMessage)
+        break;
+    }
+  }
+
+  downloadFile = (dataToBeDownloaded, collectionName) => {
+    let a = document.createElement("a");
+    let dataURI = "data:text/plain;base64," + btoa(dataToBeDownloaded);
+    a.href = dataURI;
+    a['download'] = collectionName + ".scss";
+    a.click();
+    a.remove();
+ }
+</script>
