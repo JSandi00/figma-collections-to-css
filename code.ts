@@ -2,6 +2,7 @@
 // the *figma document* via the figma global object.
 // You can access browser APIs in the <script> tag inside "ui.html" which has a
 // full browser environment (See https://www.figma.com/plugin-docs/how-plugins-run).
+// import {parceFinalResponse, getVariableMode, getVariableName} from './formating.helper'
 
 console.clear();
 
@@ -20,9 +21,9 @@ type RGBType = {
 //code html conications types
 const COLLECTION_RESPONSE = 'COLLECTION_RESPONSE';
 const COLLECTION_AVAILABLE = 'COLLECTION_AVAILABLE';
-type FinalReponse = {};
 
 let response = ``;
+let sortedVariableNames: Record<string, string> = {}; 
 
 // Runs this code if the plugin is run in Figma
 if (figma.editorType === 'figma') {
@@ -39,6 +40,8 @@ if (figma.editorType === 'figma') {
   // posted message.
   figma.ui.onmessage = msg => {
     if (msg.type === 'create-scss') {
+      sortedVariableNames = {};
+
       let collection = figma.variables.getVariableCollectionById(msg.selectedCollectionId);
         response = `//Collection: ${collection!.name} with mode: ${msg.selectedModeName}
 `;
@@ -56,8 +59,8 @@ if (figma.editorType === 'figma') {
             getVariableValue(mode, 'firstKeyMode', variable.name);
           }
         });
-        console.log(response);
-        figma.ui.postMessage({type: COLLECTION_RESPONSE, response: response, collectionName: collection!.name});
+        response += writeFinalResponse();
+        figma.ui.postMessage({type: COLLECTION_RESPONSE, response: response, collectionName: collection!.name, selectedMode: msg.selectedModeName});
 
     }else if (msg.type === 'load-collections'){
       let collections = figma.variables.getLocalVariableCollections();
@@ -88,9 +91,9 @@ if (figma.editorType === 'figma') {
 
         //for future inplementation, this works like an option to replace (only to layers down) if the value of var is another var, with the actual hex
         // findReferenceHex(parsedChildMode, modeObj, originalVariableName);
-        parceFinalResponse(originalVariableName, false, null, childVariableName);
+        sortFinalResponse(originalVariableName, false, null, childVariableName);
       }else {
-        parceFinalResponse(originalVariableName, true, modeObj);
+        sortFinalResponse(originalVariableName, true, modeObj);
       }
   }
 } //end if figma
@@ -106,11 +109,12 @@ function findReferenceHex(parsedChildMode: any, modeObj: any, originalVariableNa
       console.log('!!!!!!!!!', firstChildMode);
       let parcedGrandChildMode = getVariableMode(firstChildMode['id']); //this (for know) must be rgb @TODO: work in recursive solution
       console.log('first mode ', parcedGrandChildMode)
-      return parceFinalResponse(originalVariableName, false, parcedGrandChildMode);
+      return sortFinalResponse(originalVariableName, false, parcedGrandChildMode);
     } else {
-      return parceFinalResponse(originalVariableName, false, parsedChildMode);
+      return sortFinalResponse(originalVariableName, false, parsedChildMode);
     }
 }
+ 
 
 /**
  * this format the final string to export
@@ -119,87 +123,102 @@ function findReferenceHex(parsedChildMode: any, modeObj: any, originalVariableNa
  * @param pureObj 
  * @returns 
  */
-function parceFinalResponse(fullVariableName: string, pureObj: boolean, childMode?: any, fullChildVarName?: string) {
-  //TODO: manage the export per collection not from a unique variable 
-  
-  let parentName = fullVariableName.split('/').pop(); //Choosing the last element of the array, that is the actuall name of the variable;
-  if(fullChildVarName){
-    let childName = fullChildVarName.split('/').pop(); //Choosing the last element of the array, that is the actuall name of the variable;
-    response += `$${parentName}: $${childName}; \n`;
-  }else {
-    let hex = rgbToHex(getRgbFromMode(childMode, pureObj));
-    response += `$${parentName}: ${hex};
-    `;
-  }
-}
+function sortFinalResponse(fullVariableName: string, pureObj: boolean, childMode?: any, fullChildVarName?: string) {
+    //TODO: manage the export per collection not from a unique variable 
+    let parentName = fullVariableName.split('/').pop(); //Choosing the last element of the array, that is the actuall name of the variable;
+    let category: string = fullVariableName.split('/')[1] ? fullVariableName.split('/')[1] : fullVariableName.split('/')[0];
+    
+    if(fullChildVarName){
+      let childName = fullChildVarName.split('/').pop(); //Choosing the last element of the array, that is the actuall name of the variable;
+      if(sortedVariableNames[category] == undefined){
+        sortedVariableNames[category] = '';
+      }
+      sortedVariableNames[category] += `$${parentName}: $${childName}; \n `;
 
-/**
- * returns child reference mode of a linked variable id
- * @param variableId 
- * @returns 
- */
-function getVariableMode(variableId: string){
-  let nestedVariable = figma.variables.getVariableById(variableId);
-  let childMode = nestedVariable!.valuesByMode; //this (for know) must be rgb @TODO: work in recursive solution
-  return JSON.parse(JSON.stringify(childMode));
-}
-
-/**
- * Gets the variable name of specofic variable
- * @param variableId 
- * @returns 
- */
-function getVariableName(variableId: string){
-  return figma.variables.getVariableById(variableId)?.name;
-}
-
-//WIP for recursive implementation *******
-function verifyType(modeObj: ModeType | RGBType) {
-  if(Object.prototype.hasOwnProperty.call(modeObj, 'type')){
-    console.log('verifyng...');
-  }else {
-
-  }
-}
-
-/**
- * this convert the mode values rgb in hex
- * @param modeObj 
- * @param pureObj indicates if the object is object or array object TODO: work in better solution for automatic detection for this
- * @returns 
- */
-function getRgbFromMode(modeObj: RGBType, pureObj: boolean) {
-  let parsedMode = JSON.parse(JSON.stringify(modeObj));
-  let r = 0.02;
-  let g = 0.02;
-  let b = 0.02;
-
-  if(!pureObj){
-    for (const key in parsedMode) {
-      let rgb = parsedMode[key];
-      r = rgb['r'];
-      g = rgb['g'];
-      b = rgb['b'];
+    }else {
+      let hex = rgbToHex(getRgbFromMode(childMode, pureObj));
+      if(sortedVariableNames[category] == undefined){
+        sortedVariableNames[category] = '';
+      }
+      sortedVariableNames[category] += `$${parentName}: ${hex}; \n`;
     }
-  }else {
-    r = parsedMode['r'];
-    g = parsedMode['g'];
-    b = parsedMode['b'];
+  }
+
+  function writeFinalResponse () {
+    let res = ''
+    for (const key in sortedVariableNames) {
+      res += `\n // ${key} \n ${sortedVariableNames[key]}`
+    }
+    return res;
   }
   
-  return {r, g, b};
-}
-
-//const hex = rgbToHex({ r, g, b });
-function rgbToHex({ r, g, b }: any) {
-  const toHex = (value: any) => {
-    const hex = Math.round(value * 255).toString(16);
-    return hex.length === 1 ? "0" + hex : hex;
-  };
-
-  const hex = [toHex(r), toHex(g), toHex(b)].join("");
-  return `#${hex}`;
-}
+  /**
+   * returns child reference mode of a linked variable id
+   * @param variableId 
+   * @returns 
+   */
+  function getVariableMode(variableId: string){
+    let nestedVariable = figma.variables.getVariableById(variableId);
+    let childMode = nestedVariable!.valuesByMode; //this (for know) must be rgb @TODO: work in recursive solution
+    return JSON.parse(JSON.stringify(childMode));
+  }
+  
+  /**
+   * Gets the variable name of specofic variable
+   * @param variableId 
+   * @returns 
+   */
+  function getVariableName(variableId: string){
+    return figma.variables.getVariableById(variableId)?.name;
+  }
+  
+  //WIP for recursive implementation *******
+  function verifyType(modeObj: ModeType | RGBType) {
+    if(Object.prototype.hasOwnProperty.call(modeObj, 'type')){
+      console.log('verifyng...');
+    }else {
+  
+    }
+  }
+  
+  /**
+   * this convert the mode values rgb in hex
+   * @param modeObj 
+   * @param pureObj indicates if the object is object or array object TODO: work in better solution for automatic detection for this
+   * @returns 
+   */
+  function getRgbFromMode(modeObj: RGBType, pureObj: boolean) {
+    let parsedMode = JSON.parse(JSON.stringify(modeObj));
+    let r = 0.02;
+    let g = 0.02;
+    let b = 0.02;
+  
+    if(!pureObj){
+      for (const key in parsedMode) {
+        let rgb = parsedMode[key];
+        r = rgb['r'];
+        g = rgb['g'];
+        b = rgb['b'];
+      }
+    }else {
+      r = parsedMode['r'];
+      g = parsedMode['g'];
+      b = parsedMode['b'];
+    }
+    
+    return {r, g, b};
+  }
+  
+  //const hex = rgbToHex({ r, g, b });
+  function rgbToHex({ r, g, b }: any) {
+    const toHex = (value: any) => {
+      const hex = Math.round(value * 255).toString(16);
+      return hex.length === 1 ? "0" + hex : hex;
+    };
+  
+    const hex = [toHex(r), toHex(g), toHex(b)].join("");
+    return `#${hex}`;
+  }
 
 // Runs this code if the plugin is run in FigJam
 if (figma.editorType === 'figjam') {

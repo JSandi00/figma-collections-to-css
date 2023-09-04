@@ -31,7 +31,7 @@
   onmessage = (event) => {
     switch(event.data.pluginMessage['type']){
       case 'COLLECTION_RESPONSE':
-        downloadFile(event.data.pluginMessage['response'], event.data.pluginMessage['collectionName']);
+        downloadFile(event.data.pluginMessage['response'], event.data.pluginMessage['collectionName'], event.data.pluginMessage['selectedMode']);
         break;
       case 'COLLECTION_AVAILABLE':
         let collection = event.data.pluginMessage['response'];
@@ -40,8 +40,6 @@
         let tittle = document.createElement('h2');
         tittle.appendChild(document.createTextNode(collection.name));
         optContainer.appendChild(tittle);
-
-        console.log(collection);
 
         collection.modes.forEach( mode => {
           var checkbox = document.createElement('input');
@@ -75,11 +73,11 @@
     }
   }
 
-  downloadFile = (dataToBeDownloaded, collectionName) => {
+  downloadFile = (dataToBeDownloaded, collectionName, selectedMode) => {
     let a = document.createElement("a");
     let dataURI = "data:text/plain;base64," + btoa(dataToBeDownloaded);
     a.href = dataURI;
-    a['download'] = collectionName + ".scss";
+    a['download'] = collectionName + " - " + selectedMode + ".scss";
     a.click();
     a.remove();
  }

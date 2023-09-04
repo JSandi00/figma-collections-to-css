@@ -3,11 +3,13 @@
 // the *figma document* via the figma global object.
 // You can access browser APIs in the <script> tag inside "ui.html" which has a
 // full browser environment (See https://www.figma.com/plugin-docs/how-plugins-run).
+// import {parceFinalResponse, getVariableMode, getVariableName} from './formating.helper'
 console.clear();
 //code html conications types
 const COLLECTION_RESPONSE = 'COLLECTION_RESPONSE';
 const COLLECTION_AVAILABLE = 'COLLECTION_AVAILABLE';
 let response = ``;
+let sortedVariableNames = {};
 // Runs this code if the plugin is run in Figma
 if (figma.editorType === 'figma') {
     // This plugin will open a window to prompt the user to enter a number, and
@@ -20,6 +22,7 @@ if (figma.editorType === 'figma') {
     // posted message.
     figma.ui.onmessage = msg => {
         if (msg.type === 'create-scss') {
+            sortedVariableNames = {};
             let collection = figma.variables.getVariableCollectionById(msg.selectedCollectionId);
             response = `//Collection: ${collection.name} with mode: ${msg.selectedModeName}
 `;
@@ -36,8 +39,8 @@ if (figma.editorType === 'figma') {
                     getVariableValue(mode, 'firstKeyMode', variable.name);
                 }
             });
-            console.log(response);
-            figma.ui.postMessage({ type: COLLECTION_RESPONSE, response: response, collectionName: collection.name });
+            response += writeFinalResponse();
+            figma.ui.postMessage({ type: COLLECTION_RESPONSE, response: response, collectionName: collection.name, selectedMode: msg.selectedModeName });
         }
         else if (msg.type === 'load-collections') {
             let collections = figma.variables.getLocalVariableCollections();
@@ -66,10 +69,10 @@ if (figma.editorType === 'figma') {
             let childVariableName = getVariableName(modeObj['id']);
             //for future inplementation, this works like an option to replace (only to layers down) if the value of var is another var, with the actual hex
             // findReferenceHex(parsedChildMode, modeObj, originalVariableName);
-            parceFinalResponse(originalVariableName, false, null, childVariableName);
+            sortFinalResponse(originalVariableName, false, null, childVariableName);
         }
         else {
-            parceFinalResponse(originalVariableName, true, modeObj);
+            sortFinalResponse(originalVariableName, true, modeObj);
         }
     }
 } //end if figma
@@ -83,10 +86,10 @@ function findReferenceHex(parsedChildMode, modeObj, originalVariableName) {
         console.log('!!!!!!!!!', firstChildMode);
         let parcedGrandChildMode = getVariableMode(firstChildMode['id']); //this (for know) must be rgb @TODO: work in recursive solution
         console.log('first mode ', parcedGrandChildMode);
-        return parceFinalResponse(originalVariableName, false, parcedGrandChildMode);
+        return sortFinalResponse(originalVariableName, false, parcedGrandChildMode);
     }
     else {
-        return parceFinalResponse(originalVariableName, false, parsedChildMode);
+        return sortFinalResponse(originalVariableName, false, parsedChildMode);
     }
 }
 /**
@@ -96,18 +99,31 @@ function findReferenceHex(parsedChildMode, modeObj, originalVariableName) {
  * @param pureObj
  * @returns
  */
-function parceFinalResponse(fullVariableName, pureObj, childMode, fullChildVarName) {
+function sortFinalResponse(fullVariableName, pureObj, childMode, fullChildVarName) {
     //TODO: manage the export per collection not from a unique variable 
     let parentName = fullVariableName.split('/').pop(); //Choosing the last element of the array, that is the actuall name of the variable;
+    let category = fullVariableName.split('/')[1] ? fullVariableName.split('/')[1] : fullVariableName.split('/')[0];
     if (fullChildVarName) {
         let childName = fullChildVarName.split('/').pop(); //Choosing the last element of the array, that is the actuall name of the variable;
-        response += `$${parentName}: $${childName}; \n`;
+        if (sortedVariableNames[category] == undefined) {
+            sortedVariableNames[category] = '';
+        }
+        sortedVariableNames[category] += `$${parentName}: $${childName}; \n `;
     }
     else {
         let hex = rgbToHex(getRgbFromMode(childMode, pureObj));
-        response += `$${parentName}: ${hex};
-    `;
+        if (sortedVariableNames[category] == undefined) {
+            sortedVariableNames[category] = '';
+        }
+        sortedVariableNames[category] += `$${parentName}: ${hex}; \n`;
     }
+}
+function writeFinalResponse() {
+    let res = '';
+    for (const key in sortedVariableNames) {
+        res += `\n // ${key} \n ${sortedVariableNames[key]}`;
+    }
+    return res;
 }
 /**
  * returns child reference mode of a linked variable id
