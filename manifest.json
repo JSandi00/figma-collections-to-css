@@ -1,13 +1,12 @@
 {
   "name": "tokens-to-css",
-  "id": "1263929661307351015",
+  "id": "1280919269826963541",
   "api": "1.0.0",
   "main": "code.js",
   "capabilities": [],
   "enableProposedApi": false,
   "editorType": [
-    "figma",
-    "figjam"
+    "figma"
   ],
   "ui": "ui.html",
   "networkAccess": {
